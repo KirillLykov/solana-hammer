@@ -54,7 +54,7 @@ The steps for running the hammer against a cluster are:
    b. Building the program (using 'make'), which requires that these keypairs already exist in the 'keys'
       directory under the names "program_1.json", "program_2.json", etc.
       (So for example:
-       $ for i in `seq 1 10`; do solana-keygen new -s --no-bip39-passphrase -o keys/program_$i.json
+       $ for i in `seq 1 10`; do solana-keygen new -s --no-bip39-passphrase -o keys/program_$i.json; done
        $ make
       )
    c. Uploading these programs one by one

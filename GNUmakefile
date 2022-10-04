@@ -1,4 +1,6 @@
 
+SHELL=bash
+STRIP=/usr/lib/llvm-10/bin/llvm-strip
 # You must have the Solana cli installed in the normal place
 SDK_ROOT=$(shell echo ~/.local/share/solana/install/active_release/bin/sdk)
 #SDK_ROOT=$(shell echo ~/.local/share/solana/install/releases/1.9.13/solana-release/bin/sdk)
@@ -36,7 +38,7 @@ target/program_1.po: $(wildcard program/*.c program/*.h) util/bs58/target/releas
 target/program_1.so: target/program_1.po
 	@mkdir -p $(dir $@)
 	$(SDK_LD) -z notext -shared --Bdynamic $(SDK_ROOT)/bpf/c/bpf.ld --entry entrypoint -o $@ $^
-	strip -s -R .comment $@
+	$(STRIP) -s -R .comment $@
 
 target/program_2.po: $(wildcard program/*.c program/*.h) util/bs58/target/release/bs58
 	@mkdir -p $(dir $@)
@@ -48,7 +50,7 @@ target/program_2.po: $(wildcard program/*.c program/*.h) util/bs58/target/releas
 target/program_2.so: target/program_2.po
 	@mkdir -p $(dir $@)
 	$(SDK_LD) -z notext -shared --Bdynamic $(SDK_ROOT)/bpf/c/bpf.ld --entry entrypoint -o $@ $^
-	strip -s -R .comment $@
+	$(STRIP) -s -R .comment $@
 
 target/program_3.po: $(wildcard program/*.c program/*.h) util/bs58/target/release/bs58
 	@mkdir -p $(dir $@)
@@ -60,7 +62,7 @@ target/program_3.po: $(wildcard program/*.c program/*.h) util/bs58/target/releas
 target/program_3.so: target/program_3.po
 	@mkdir -p $(dir $@)
 	$(SDK_LD) -z notext -shared --Bdynamic $(SDK_ROOT)/bpf/c/bpf.ld --entry entrypoint -o $@ $^
-	strip -s -R .comment $@
+	$(STRIP) -s -R .comment $@
 
 target/program_4.po: $(wildcard program/*.c program/*.h) util/bs58/target/release/bs58
 	@mkdir -p $(dir $@)
@@ -72,7 +74,7 @@ target/program_4.po: $(wildcard program/*.c program/*.h) util/bs58/target/releas
 target/program_4.so: target/program_4.po
 	@mkdir -p $(dir $@)
 	$(SDK_LD) -z notext -shared --Bdynamic $(SDK_ROOT)/bpf/c/bpf.ld --entry entrypoint -o $@ $^
-	strip -s -R .comment $@
+	$(STRIP) -s -R .comment $@
 
 target/program_5.po: $(wildcard program/*.c program/*.h) util/bs58/target/release/bs58
 	@mkdir -p $(dir $@)
@@ -84,7 +86,7 @@ target/program_5.po: $(wildcard program/*.c program/*.h) util/bs58/target/releas
 target/program_5.so: target/program_5.po
 	@mkdir -p $(dir $@)
 	$(SDK_LD) -z notext -shared --Bdynamic $(SDK_ROOT)/bpf/c/bpf.ld --entry entrypoint -o $@ $^
-	strip -s -R .comment $@
+	$(STRIP) -s -R .comment $@
 
 target/program_6.po: $(wildcard program/*.c program/*.h) util/bs58/target/release/bs58
 	@mkdir -p $(dir $@)
@@ -96,7 +98,7 @@ target/program_6.po: $(wildcard program/*.c program/*.h) util/bs58/target/releas
 target/program_6.so: target/program_6.po
 	@mkdir -p $(dir $@)
 	$(SDK_LD) -z notext -shared --Bdynamic $(SDK_ROOT)/bpf/c/bpf.ld --entry entrypoint -o $@ $^
-	strip -s -R .comment $@
+	$(STRIP) -s -R .comment $@
 
 target/program_7.po: $(wildcard program/*.c program/*.h) util/bs58/target/release/bs58
 	@mkdir -p $(dir $@)
@@ -108,7 +110,7 @@ target/program_7.po: $(wildcard program/*.c program/*.h) util/bs58/target/releas
 target/program_7.so: target/program_7.po
 	@mkdir -p $(dir $@)
 	$(SDK_LD) -z notext -shared --Bdynamic $(SDK_ROOT)/bpf/c/bpf.ld --entry entrypoint -o $@ $^
-	strip -s -R .comment $@
+	$(STRIP) -s -R .comment $@
 
 target/program_8.po: $(wildcard program/*.c program/*.h) util/bs58/target/release/bs58
 	@mkdir -p $(dir $@)
@@ -120,7 +122,7 @@ target/program_8.po: $(wildcard program/*.c program/*.h) util/bs58/target/releas
 target/program_8.so: target/program_8.po
 	@mkdir -p $(dir $@)
 	$(SDK_LD) -z notext -shared --Bdynamic $(SDK_ROOT)/bpf/c/bpf.ld --entry entrypoint -o $@ $^
-	strip -s -R .comment $@
+	$(STRIP) -s -R .comment $@
 
 target/program_9.po: $(wildcard program/*.c program/*.h) util/bs58/target/release/bs58
 	@mkdir -p $(dir $@)
@@ -132,7 +134,7 @@ target/program_9.po: $(wildcard program/*.c program/*.h) util/bs58/target/releas
 target/program_9.so: target/program_9.po
 	@mkdir -p $(dir $@)
 	$(SDK_LD) -z notext -shared --Bdynamic $(SDK_ROOT)/bpf/c/bpf.ld --entry entrypoint -o $@ $^
-	strip -s -R .comment $@
+	$(STRIP) -s -R .comment $@
 
 target/program_10.po: $(wildcard program/*.c program/*.h) util/bs58/target/release/bs58
 	@mkdir -p $(dir $@)
@@ -144,7 +146,7 @@ target/program_10.po: $(wildcard program/*.c program/*.h) util/bs58/target/relea
 target/program_10.so: target/program_10.po
 	@mkdir -p $(dir $@)
 	$(SDK_LD) -z notext -shared --Bdynamic $(SDK_ROOT)/bpf/c/bpf.ld --entry entrypoint -o $@ $^
-	strip -s -R .comment $@
+	$(STRIP) -s -R .comment $@
 
 .PHONY: clean
 clean:
