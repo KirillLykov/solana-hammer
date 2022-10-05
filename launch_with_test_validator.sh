@@ -18,6 +18,7 @@
 
 #./client/target/release/fetch_tpu --gossip-entrypoint 127.0.0.1:1024 --output-file tpu.bin
 
+cargo build --manifest-path client/Cargo.toml --release
 ./client/target/release/client\
          --tpu-file tpu.bin \
          --rpc-server http://localhost:8899 \
@@ -25,5 +26,7 @@
          --program-id  59TbbR1hF3hZbeeV7PZTPp9zGaVybETevnTe6S2qJywK\
          --program-id  49Ffhy9USyAFKxEn1NLy9wBcJg2yoZLFkpaUWn71NmpH\
          --program-id  6uPMsjKkjrKwB63rMVuuCdPAewFzsqyepbkP8xCMJe2z\
-         --num-threads 10 \
-         --total-transactions 10000
+         --num-threads 1 \
+         --total-transactions 10
+
+

@@ -235,6 +235,7 @@ impl LeadersFetcher
                     Ok(new_leaders) => {
                         *(self.leaders.lock().unwrap()) =
                             (slot, new_leaders.into_iter().map(|p| format!("{}", p)).collect());
+                        println!("AAA");
                         break;
                     },
                     Err(err) => eprintln!("Failed to fetch slot leaders: {}", err)
@@ -336,7 +337,9 @@ impl CurrentTpus
             else {
                 std::thread::sleep(Duration::from_millis(500));
             }
+            println!("Looping");
         };
+        println!("Done fetching TPUs");
 
         let current_tpus = Arc::new(Mutex::new(current_tpus));
 
@@ -425,6 +428,7 @@ impl CurrentTpus
             // The slot that we believe is the current leader slot is not bounded by the leader slots
             // that we know about.  So re-fetch the current slots and also the upcoming leader slots,
             // and try again.
+            println!("BLA");
             slot_fetcher.update(&rpc_client);
             leaders_fetcher.update(&rpc_client);
             None
@@ -1216,7 +1220,9 @@ fn transaction_thread_function(
                         &recent_blockhash
                     );
                     // If the balance is still too low, continue the loop to try again
+                    println!("TRANSFERED = {}", LAMPORTS_PER_TRANSFER);
                     if rpc_client.get_balance(&fee_payer_pubkey).unwrap_or(0) < LAMPORTS_PER_TRANSFER {
+                        println!("TRANSFERED FAILED");
                         // Wait until the recent blockhash has changed so as not to repeat the request
                         loop {
                             std::thread::sleep(Duration::from_millis(250));
