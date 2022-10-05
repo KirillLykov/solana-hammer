@@ -389,10 +389,13 @@ impl CurrentTpus
         let prev = leaders_fetcher.get(slot - 4);
         let current = leaders_fetcher.get(slot);
         let next = leaders_fetcher.get(slot + 4);
-        if prev.is_some() && current.is_some() && next.is_some() {
-            let prev = tpu_fetcher.get(&prev.unwrap());
-            let current = tpu_fetcher.get(&current.unwrap());
-            let next = tpu_fetcher.get(&next.unwrap());
+
+        //println!("prev = {}, current = {}, next = {}", prev.is_some(), current.is_some(), next.is_some());
+        if prev.is_some() || current.is_some() || next.is_some() {
+            let prev = prev.map_or(None, |prev| tpu_fetcher.get(&prev));
+            let current = current.map_or(None, |current| tpu_fetcher.get(&current));
+            let next = next.map_or(None, |next| tpu_fetcher.get(&next));
+            println!("prev = {}, current = {}, next = {}", prev.is_some(), current.is_some(), next.is_some());
             if prev.is_none() {
                 if current.is_none() {
                     if next.is_none() {
@@ -1374,8 +1377,12 @@ fn transaction_thread_function(
         // Actually just send to 'current'.  Sending to others doesn't seem to improve the rate at which
         // transactions land.
         //let _ = UdpSocket::bind("0.0.0.0:0").unwrap().send_to(tx_bytes.as_slice(), current_tpus.0);
-        let _ = UdpSocket::bind("0.0.0.0:0").unwrap().send_to(tx_bytes.as_slice(), current_tpus.1);
+        //let _ = UdpSocket::bind("0.0.0.0:0").unwrap().send_to(tx_bytes.as_slice(), current_tpus.1);
         //let _ = UdpSocket::bind("0.0.0.0:0").unwrap().send_to(tx_bytes.as_slice(), current_tpus.2);
+        
+        let rpc_client = { rpc_clients.lock().unwrap().get() };
+        let res = rpc_client.send_transaction(&transaction);
+        println!("RESULT = {:?}", res);
     }
 
     // Take back all SOL from the fee payer
