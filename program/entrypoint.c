@@ -1,7 +1,7 @@
 
 #include "solana_sdk.h"
 
-#define DO_LOGGING 0
+#define DO_LOGGING 1
 
 // Functions missing from solana_sdk.h
 extern uint64_t sol_get_clock_sysvar(void *ret);

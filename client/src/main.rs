@@ -44,7 +44,7 @@ const FREE_COMMAND_COST : u32 = 100;
 const SYSVAR_COMMAND_COST : u32 = 500;
 
 // These govern the shape of transactions; these could be made into command line parameters if that was useful
-const FAIL_COMMAND_CHANCE : f32 = 0.001;
+const FAIL_COMMAND_CHANCE : f32 = 0.000;
 const MAX_ALLOC_BYTES : u32 = 1000;
 const RECENT_BLOCKHASH_REFRESH_INTERVAL_SECS : u64 = 10;
 const CONTENTION_ACCOUNT_COUNT : u32 = 20;
@@ -1083,17 +1083,20 @@ fn make_command(
 {
     let mut data = vec![];
 
+    //TODO(klykov): comment for now
     // Chance of straight up fail
-    if random_chance(rng, FAIL_COMMAND_CHANCE) {
-        add_fail_command(((rng.next_u32() % 255) + 1) as u8, command_accounts, &mut data);
-        (data, FAIL_COMMAND_COST)
-    }
-    else {
+    //if random_chance(rng, FAIL_COMMAND_CHANCE) {
+    //    add_fail_command(((rng.next_u32() % 255) + 1) as u8, command_accounts, &mut data);
+    //    (data, FAIL_COMMAND_COST)
+    //} else
+    {
         let mut v = vec![];
         if compute_budget >= CPU_COMMAND_COST_PER_ITERATION {
             v.push(0); // cpu
         }
-        if (compute_budget >= ALLOC_COMMAND_COST) && (allocated_indices.len() < 256) {
+        
+        //TODO(klykov): comment for now
+        /*if (compute_budget >= ALLOC_COMMAND_COST) && (allocated_indices.len() < 256) {
             v.push(1); // alloc
         }
         if (compute_budget >= FREE_COMMAND_COST) && (allocated_indices.len() > 0) {
@@ -1102,6 +1105,7 @@ fn make_command(
         if compute_budget >= SYSVAR_COMMAND_COST {
             v.push(4); // sysvar
         }
+        */
         if v.len() == 0 {
             // No command can fit, so do nothing but use all compute budget
             return (data, compute_budget);
