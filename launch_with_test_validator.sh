@@ -11,7 +11,7 @@
 #solana-test-validator
 # create ne default signer
 #solana-keygen new -o keys/admin.json
-#solana airdrop 50000 <PUBKEY> 
+#solana airdrop 50000 keys/admin.json
 #for i in `seq 1 10`; do solana -u localhost --use-quic -k keys/admin.json program deploy --program-id keys/program_$i.json target/program_$i.so; done
 #cargo build --manifest-path client/Cargo.toml --release
 #for i in `seq 1 10`; do ./client/target/release/make_contention_accounts --fee-payer ./keys/admin.json --rpc-node http://localhost:8899  --program-id ./keys/program_$i.json; done

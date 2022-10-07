@@ -33,10 +33,11 @@ use std::time::{Duration, SystemTime};
 // should be as close as possible to the actual compute unit cost, and should err on the side of over-estimating
 // costs if necessary.  These are hardcoded from observed values and could be made overridable by command line
 // parameters if that ends up being useful.
-const SMALL_TX_MAX_COMPUTE_UNITS : u32 = 40_000;
-const MEDIUM_TX_MAX_COMPUTE_UNITS : u32 = 1_100_000;
-const LARGE_TX_MAX_COMPUTE_UNITS : u32 = 1_400_000;
-const MAX_INSTRUCTION_COMPUTE_UNITS : u32 = 1_400_000;
+// TODO(klykov): temporary set to 400_000
+const SMALL_TX_MAX_COMPUTE_UNITS : u32 = 100_000;
+const MEDIUM_TX_MAX_COMPUTE_UNITS : u32 = 200_000;
+const LARGE_TX_MAX_COMPUTE_UNITS : u32 = 400_000;
+const MAX_INSTRUCTION_COMPUTE_UNITS : u32 = 400_000;
 const FAIL_COMMAND_COST : u32 = 1000;
 const CPU_COMMAND_COST_PER_ITERATION : u32 = 5000;
 const ALLOC_COMMAND_COST : u32 = 100;
