@@ -20,6 +20,10 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
+use solana_client::{
+        connection_cache::{ConnectionCache, DEFAULT_TPU_CONNECTION_POOL_SIZE},
+        tpu_connection::TpuConnection,
+};
 
 // Perform up to N concurrent transactions
 
@@ -33,14 +37,14 @@ use std::time::{Duration, SystemTime};
 // should be as close as possible to the actual compute unit cost, and should err on the side of over-estimating
 // costs if necessary.  These are hardcoded from observed values and could be made overridable by command line
 // parameters if that ends up being useful.
-// TODO(klykov): temporary set to 400_000
+// According to documentation, current CU budget for tx is 400k
 const SMALL_TX_MAX_COMPUTE_UNITS : u32 = 100_000;
 const MEDIUM_TX_MAX_COMPUTE_UNITS : u32 = 200_000;
-const LARGE_TX_MAX_COMPUTE_UNITS : u32 = 400_000;
+const LARGE_TX_MAX_COMPUTE_UNITS : u32 = 400_000; 
 const MAX_INSTRUCTION_COMPUTE_UNITS : u32 = 400_000;
 const FAIL_COMMAND_COST : u32 = 1000;
 const CPU_COMMAND_COST_PER_ITERATION : u32 = 5000;
-const ALLOC_COMMAND_COST : u32 = 100;
+const ALLOC_COMMAND_COST : u32 = 1500;
 const FREE_COMMAND_COST : u32 = 100;
 const SYSVAR_COMMAND_COST : u32 = 500;
 
@@ -236,7 +240,6 @@ impl LeadersFetcher
                     Ok(new_leaders) => {
                         *(self.leaders.lock().unwrap()) =
                             (slot, new_leaders.into_iter().map(|p| format!("{}", p)).collect());
-                        println!("AAA");
                         break;
                     },
                     Err(err) => eprintln!("Failed to fetch slot leaders: {}", err)
@@ -391,12 +394,10 @@ impl CurrentTpus
         let current = leaders_fetcher.get(slot);
         let next = leaders_fetcher.get(slot + 4);
 
-        //println!("prev = {}, current = {}, next = {}", prev.is_some(), current.is_some(), next.is_some());
         if prev.is_some() || current.is_some() || next.is_some() {
             let prev = prev.map_or(None, |prev| tpu_fetcher.get(&prev));
             let current = current.map_or(None, |current| tpu_fetcher.get(&current));
             let next = next.map_or(None, |next| tpu_fetcher.get(&next));
-            println!("prev = {}, current = {}, next = {}", prev.is_some(), current.is_some(), next.is_some());
             if prev.is_none() {
                 if current.is_none() {
                     if next.is_none() {
@@ -432,7 +433,6 @@ impl CurrentTpus
             // The slot that we believe is the current leader slot is not bounded by the leader slots
             // that we know about.  So re-fetch the current slots and also the upcoming leader slots,
             // and try again.
-            println!("BLA");
             slot_fetcher.update(&rpc_client);
             leaders_fetcher.update(&rpc_client);
             None
@@ -1084,29 +1084,29 @@ fn make_command(
 {
     let mut data = vec![];
 
-    //TODO(klykov): comment for now
     // Chance of straight up fail
-    //if random_chance(rng, FAIL_COMMAND_CHANCE) {
-    //    add_fail_command(((rng.next_u32() % 255) + 1) as u8, command_accounts, &mut data);
-    //    (data, FAIL_COMMAND_COST)
-    //} else
+    if random_chance(rng, FAIL_COMMAND_CHANCE) {
+        add_fail_command(((rng.next_u32() % 255) + 1) as u8, command_accounts, &mut data);
+        (data, FAIL_COMMAND_COST)
+    } 
+    else
     {
         let mut v = vec![];
         if compute_budget >= CPU_COMMAND_COST_PER_ITERATION {
             v.push(0); // cpu
         }
-        
-        //TODO(klykov): comment for now
-        /*if (compute_budget >= ALLOC_COMMAND_COST) && (allocated_indices.len() < 256) {
+        if (compute_budget >= ALLOC_COMMAND_COST) && (allocated_indices.len() < 256) {
             v.push(1); // alloc
         }
+        
         if (compute_budget >= FREE_COMMAND_COST) && (allocated_indices.len() > 0) {
             v.push(2); // free
         }
+        
         if compute_budget >= SYSVAR_COMMAND_COST {
             v.push(4); // sysvar
         }
-        */
+        
         if v.len() == 0 {
             // No command can fit, so do nothing but use all compute budget
             return (data, compute_budget);
@@ -1187,6 +1187,10 @@ fn transaction_thread_function(
     let mut rng = rand::thread_rng();
 
     let mut iterations = 0;
+
+    let connection_cache = ConnectionCache::new(DEFAULT_TPU_CONNECTION_POOL_SIZE);
+    let target = current_tpus.get().1;
+    let connection = connection_cache.get_connection(&target);
 
     loop {
         // When the stop file exists, stop the loop
@@ -1279,7 +1283,7 @@ fn transaction_thread_function(
         let mut total_data_size = 0;
 
         // Create the commands one by one
-        while (total_data_size < 1100) && (compute_budget > 0) {
+        while (total_data_size < 900) && (compute_budget > 0) {
             let mut command_accounts = CommandAccounts::new();
             let (data, actual_compute_usage) = make_command(
                 &mut rng,
@@ -1289,10 +1293,12 @@ fn transaction_thread_function(
                 compute_budget,
                 &mut command_accounts
             );
+
             total_data_size += data.len();
             command_data.push((data, command_accounts, actual_compute_usage));
             compute_budget -= actual_compute_usage;
         }
+            println!("TOT = {}, compute_budget = {}", total_data_size, compute_budget);
 
         // Group commands together into instructions
         let mut instructions = vec![];
@@ -1342,17 +1348,21 @@ fn transaction_thread_function(
 
         // Now turn some subset of commands into cross-program invokes, if there is more than one program
         if (program_ids.len() > 1) && (instructions.len() > 0) {
+            let mut num_cpi_calls = 0;
             loop {
                 // 75% chance of not doing CPI this loop
-                if random_chance(&mut rng, 0.75) {
+                if random_chance(&mut rng, 0.5) {
                     break;
                 }
 
                 // Pick an instruction to turn into a CPI
                 let index = (rng.next_u32() % (instructions.len() as u32)) as usize;
 
+                // it might lead to reentrancy, but we are fine if some instructions fail
                 instructions[index] = make_cpi(&mut rng, &instructions[index], &program_ids);
+                num_cpi_calls += 1;
             }
+            println!("num_cpi_calls = {}", num_cpi_calls);
         }
 
         // Execute the transaction
@@ -1360,41 +1370,39 @@ fn transaction_thread_function(
         // Refresh recent blockhash
         let recent_blockhash = recent_blockhash_fetcher.lock().unwrap().get();
 
-        let transaction =
+        let mut transaction =
             Transaction::new(&vec![&fee_payer], Message::new(&instructions, Some(&fee_payer_pubkey)), recent_blockhash);
 
-        let tx_bytes = bincode::serialize(&transaction).expect("encode");
+        let mut tx_bytes = bincode::serialize(&transaction).expect("encode");
+        // TODO(klykov): inefficient but otherwise it might fail due to size limit
+        while tx_bytes.len() > 1232 {
+            println!("Remove instructions to reduce txs size ({} bytes)", tx_bytes.len());
+            instructions.pop();
+            transaction = Transaction::new(&vec![&fee_payer], Message::new(&instructions, Some(&fee_payer_pubkey)), recent_blockhash);
+            tx_bytes = bincode::serialize(&transaction).expect("encode");
+        }
 
-        let current_tpus = current_tpus.get();
+        // RPC client is handy to check errors
+        //let current_tpus = current_tpus.get();
+        //let rpc_client = { rpc_clients.lock().unwrap().get() };
+        //let res = rpc_client.send_transaction(&transaction);
+        //println!("RESULT = {:?}", res);
 
-        //        locked_println(
-        //            &print_lock,
-        //            format!(
-        //                "Thread {}: Submitting transaction to {}\n  Signature: {}",
-        //                thread_number,
-        //                //base64::encode(&tx_bytes),
-        //                current_tpu,
-        //                transaction.signatures[0]
-        //            )
-        //        );
-
-        // Send to prev, current, and next leader
-        // Actually just send to 'current'.  Sending to others doesn't seem to improve the rate at which
-        // transactions land.
-        //let _ = UdpSocket::bind("0.0.0.0:0").unwrap().send_to(tx_bytes.as_slice(), current_tpus.0);
-        //let _ = UdpSocket::bind("0.0.0.0:0").unwrap().send_to(tx_bytes.as_slice(), current_tpus.1);
-        //let _ = UdpSocket::bind("0.0.0.0:0").unwrap().send_to(tx_bytes.as_slice(), current_tpus.2);
-        
-        let rpc_client = { rpc_clients.lock().unwrap().get() };
-        let res = rpc_client.send_transaction(&transaction);
-        println!("RESULT = {:?}", res);
+        connection.send_wire_transaction(&tx_bytes);
     }
 
     // Take back all SOL from the fee payer
+    // TODO(klykov): this simply doesn't work reliably
+    /*
+    println!("Take back all SOL from the fee payer");
     let rpc_client = { rpc_clients.lock().unwrap().get() };
+
+    println!("FUND SOURCE = {}", funds_source.pubkey());
+    std::thread::sleep(Duration::from_millis(5000));
 
     loop {
         if let Some(balance) = rpc_client.get_balance(&fee_payer_pubkey).ok() {
+            println!("BALANCE = {}", balance);
             if balance == 0 {
                 break;
             }
@@ -1414,8 +1422,9 @@ fn transaction_thread_function(
                 },
                 Err(_) => ()
             }
+            std::thread::sleep(Duration::from_millis(500));
         }
-    }
+    }*/
 }
 
 fn main()
@@ -1645,5 +1654,5 @@ fn transfer_lamports(
     match rpc_client.send_and_confirm_transaction(&transaction) {
         Ok(_) => (),
         Err(err) => println!("Failed transfer: {}", err)
-    }
+   }
 }
