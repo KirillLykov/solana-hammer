@@ -35,6 +35,6 @@ export RUST_LOG=info
          --program-id  FsEzgc47HApzrJUdhFtLMKjypc3K3yippQ2wi7X99zYs\
          --program-id  FA9f5Vazh5BbjiXqoZfb3G95XPDt1xwrQwi47PyS7Pjj\
          --program-id  7azfsN2eZmQoou3AfkBaWhv2ho5M4UMmYT3N345K141W\
-         --num-threads 10 \
-         --total-transactions 100000
+         --num-threads 1 \
+         --total-transactions 1000000
 

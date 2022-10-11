@@ -1391,17 +1391,14 @@ fn transaction_thread_function(
     }
 
     // Take back all SOL from the fee payer
-    // TODO(klykov): this simply doesn't work reliably
-    /*
-    println!("Take back all SOL from the fee payer");
+    info!("Take back all SOL from the fee payer. Sleep for 60s to be sure that all the transactions have been finilazied");
     let rpc_client = { rpc_clients.lock().unwrap().get() };
+    std::thread::sleep(Duration::from_secs(60));
 
-    println!("FUND SOURCE = {}", funds_source.pubkey());
-    std::thread::sleep(Duration::from_millis(5000));
-
-    loop {
+    // try 10 times
+    for i in 0..10 {
         if let Some(balance) = rpc_client.get_balance(&fee_payer_pubkey).ok() {
-            println!("BALANCE = {}", balance);
+            info!("Current balance = {}", balance);
             if balance == 0 {
                 break;
             }
@@ -1421,9 +1418,9 @@ fn transaction_thread_function(
                 },
                 Err(_) => ()
             }
-            std::thread::sleep(Duration::from_millis(500));
+            std::thread::sleep(Duration::from_secs(10));
         }
-    }*/
+    }
 }
 
 fn main()
