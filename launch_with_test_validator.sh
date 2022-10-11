@@ -20,6 +20,7 @@
 
 cargo build --manifest-path client/Cargo.toml --release
 
+export RUST_LOG=info
 ./client/target/release/client\
          --tpu-file tpu.bin \
          --rpc-server http://localhost:8899 \

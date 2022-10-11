@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
+use log::{debug, error, warn, info};
+
 use rand::RngCore;
 //use solana_sdk::instruction::Instruction;
 use solana_client::rpc_client::RpcClient;
@@ -23,7 +25,6 @@ use std::time::{Duration, SystemTime};
 use std::process::exit;
 use solana_client::{
         connection_cache::{ConnectionCache, DEFAULT_TPU_CONNECTION_POOL_SIZE},
-        tpu_connection::TpuConnection,
         tpu_client::{TpuClient, TpuClientConfig}
 };
 
@@ -90,7 +91,7 @@ impl RecentBlockhashFetcher
                             std::thread::sleep(Duration::from_secs(RECENT_BLOCKHASH_REFRESH_INTERVAL_SECS - 5));
                         },
                         Err(err) => {
-                            eprintln!("Failed to get recent blockhash: {}", err);
+                            error!("Failed to get recent blockhash: {}", err);
                             std::thread::sleep(Duration::from_millis(500));
                         }
                     }
@@ -172,7 +173,7 @@ impl SlotFetcher
                     break;
                 },
                 Err(err) => {
-                    eprintln!("Failed to fetch epoch info: {}", err);
+                    error!("Failed to fetch epoch info: {}", err);
                 }
             }
             std::thread::sleep(Duration::from_millis(100));
@@ -244,9 +245,9 @@ impl LeadersFetcher
                             (slot, new_leaders.into_iter().map(|p| format!("{}", p)).collect());
                         break;
                     },
-                    Err(err) => eprintln!("Failed to fetch slot leaders: {}", err)
+                    Err(err) => error!("Failed to fetch slot leaders: {}", err)
                 },
-                Err(err) => eprintln!("Failed to fetch slot: {}", err)
+                Err(err) => error!("Failed to fetch slot: {}", err)
             }
 
             std::thread::sleep(Duration::from_millis(500));
@@ -297,11 +298,11 @@ impl TpuFetcher
     {
         match std::fs::read(from) {
             Ok(data) => bincode::deserialize(data.as_slice()).unwrap_or_else(|err| {
-                eprintln!("Failed to deserialize {}: {}", from, err);
+                error!("Failed to deserialize {}: {}", from, err);
                 HashMap::<String, SocketAddr>::new()
             }),
             Err(err) => {
-                eprintln!("Failed to read {}: {}", from, err);
+                error!("Failed to read {}: {}", from, err);
                 HashMap::<String, SocketAddr>::new()
             }
         }
@@ -321,19 +322,19 @@ impl CurrentTpus
         rpc_clients : &Arc<Mutex<RpcClients>>
     ) -> Self
     {
-        println!("Creating TPU fetcher");
+        info!("Creating TPU fetcher");
 
         let tpu_fetcher = TpuFetcher::new(tpu_file);
 
-        println!("Creating leaders fetcher");
+        info!("Creating leaders fetcher");
 
         let leaders_fetcher = LeadersFetcher::new(&rpc_clients);
 
-        println!("Creating slot fetcher");
+        info!("Creating slot fetcher");
 
         let slot_fetcher = SlotFetcher::new(&rpc_clients);
 
-        println!("Done creating current TPU fetcher");
+        info!("Done creating current TPU fetcher");
 
         let current_tpus = loop {
             let rpc_client = { rpc_clients.lock().unwrap().get() };
@@ -343,9 +344,9 @@ impl CurrentTpus
             else {
                 std::thread::sleep(Duration::from_millis(500));
             }
-            println!("Looping");
+            debug!("Looping");
         };
-        println!("Done fetching TPUs");
+        info!("Done fetching TPUs");
 
         let current_tpus = Arc::new(Mutex::new(current_tpus));
 
@@ -781,7 +782,7 @@ fn parse_args() -> Result<Args, String>
                 }
                 let file = args.nth(0).ok_or("--funds-source requires a value".to_string())?;
                 funds_source = Some(read_keypair_file(file.clone()).unwrap_or_else(|e| {
-                    eprintln!("Failed to read {}", file);
+                    error!("Failed to read {}", file);
                     std::process::exit(-1)
                 }));
             },
@@ -1213,14 +1214,14 @@ fn transaction_thread_function(
         if (iterations % 1000) == 0 {
             let total_transactions = { *(total_transactions.lock().unwrap()) };
             if let Some(total_transactions) = total_transactions {
-                println!("Thread {}: iteration {} ({} remaining)", thread_number, iterations, total_transactions);
+                info!("Thread {}: iteration {} ({} remaining)", thread_number, iterations, total_transactions);
             }
             else {
-                println!("Thread {}: iteration {}", thread_number, iterations);
+                info!("Thread {}: iteration {}", thread_number, iterations);
             }
             // When balance falls below 1 SOL, take 1 SOL from funds source
             loop {
-                if tpu_client.get_balance(&fee_payer_pubkey).unwrap_or(0) < (LAMPORTS_PER_TRANSFER / 2) {
+                if rpc_client.get_balance(&fee_payer_pubkey).unwrap_or(0) < (LAMPORTS_PER_TRANSFER / 2) {
                     transfer_lamports(
                         &rpc_client,
                         &funds_source,
@@ -1230,9 +1231,9 @@ fn transaction_thread_function(
                         &recent_blockhash
                     );
                     // If the balance is still too low, continue the loop to try again
-                    println!("TRANSFERED = {}", LAMPORTS_PER_TRANSFER);
+                    info!("TRANSFERED = {}", LAMPORTS_PER_TRANSFER);
                     if rpc_client.get_balance(&fee_payer_pubkey).unwrap_or(0) < LAMPORTS_PER_TRANSFER {
-                        println!("TRANSFERED FAILED");
+                        warn!("TRANSFERED FAILED");
                         // Wait until the recent blockhash has changed so as not to repeat the request
                         loop {
                             std::thread::sleep(Duration::from_millis(250));
@@ -1296,7 +1297,7 @@ fn transaction_thread_function(
             command_data.push((data, command_accounts, actual_compute_usage));
             compute_budget -= actual_compute_usage;
         }
-            println!("TOT = {}, compute_budget = {}", total_data_size, compute_budget);
+            debug!("TOT = {}, compute_budget = {}", total_data_size, compute_budget);
 
         // Group commands together into instructions
         let mut instructions = vec![];
@@ -1360,7 +1361,7 @@ fn transaction_thread_function(
                 instructions[index] = make_cpi(&mut rng, &instructions[index], &program_ids);
                 num_cpi_calls += 1;
             }
-            println!("num_cpi_calls = {}", num_cpi_calls);
+            debug!("num_cpi_calls = {}", num_cpi_calls);
         }
 
         // Execute the transaction
@@ -1374,7 +1375,7 @@ fn transaction_thread_function(
         let mut tx_bytes = bincode::serialize(&transaction).expect("encode");
         // TODO(klykov): inefficient but otherwise it might fail due to size limit
         while tx_bytes.len() > 1232 {
-            println!("Remove instructions to reduce txs size ({} bytes)", tx_bytes.len());
+            debug!("Remove instructions to reduce txs size ({} bytes)", tx_bytes.len());
             instructions.pop();
             transaction = Transaction::new(&vec![&fee_payer], Message::new(&instructions, Some(&fee_payer_pubkey)), recent_blockhash);
             tx_bytes = bincode::serialize(&transaction).expect("encode");
@@ -1427,6 +1428,7 @@ fn transaction_thread_function(
 
 fn main()
 {
+    env_logger::init();
     let args = parse_args().unwrap_or_else(|e| {
         eprintln!("{}", e);
         std::process::exit(-1)
@@ -1542,7 +1544,7 @@ fn main()
             Arc::new(connection_cache),
                 )
                 .unwrap_or_else(|err| {
-                    eprintln!("Could not create TpuClient {:?}", err);
+                    error!("Could not create TpuClient {:?}", err);
                     exit(1);
                 }),
     );
@@ -1661,7 +1663,7 @@ fn transfer_lamports(
         return;
     }
 
-    println!("Transferring {} from {} to {}", amount, funds_source.pubkey(), target);
+    info!("Transferring {} from {} to {}", amount, funds_source.pubkey(), target);
 
     let transaction = Transaction::new(
         &vec![fee_payer, funds_source],
@@ -1675,6 +1677,6 @@ fn transfer_lamports(
     // Ignore the result.  If take_funds fails, the check for balance will try again.
     match rpc_client.send_and_confirm_transaction(&transaction) {
         Ok(_) => (),
-        Err(err) => println!("Failed transfer: {}", err)
+        Err(err) => warn!("Failed transfer: {}", err)
    }
 }
