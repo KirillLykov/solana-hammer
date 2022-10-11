@@ -15,14 +15,16 @@ use solana_sdk::system_instruction;
 use solana_sdk::transaction::Transaction;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::net::{SocketAddr, UdpSocket};
+use std::net::SocketAddr;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
+use std::process::exit;
 use solana_client::{
         connection_cache::{ConnectionCache, DEFAULT_TPU_CONNECTION_POOL_SIZE},
         tpu_connection::TpuConnection,
+        tpu_client::{TpuClient, TpuClientConfig}
 };
 
 // Perform up to N concurrent transactions
@@ -1171,7 +1173,8 @@ fn transaction_thread_function(
     mut accounts : Arc<Mutex<Accounts>>,
     current_tpus : CurrentTpus,
     total_transactions : Arc<Mutex<Option<u64>>>,
-    stop_file : &str
+    stop_file : &str,
+    tpu_client: Arc<TpuClient>
 )
 {
     // Make a fee payer for this thread
@@ -1187,11 +1190,6 @@ fn transaction_thread_function(
     let mut rng = rand::thread_rng();
 
     let mut iterations = 0;
-
-    let connection_cache = ConnectionCache::new(DEFAULT_TPU_CONNECTION_POOL_SIZE);
-    let target = current_tpus.get().1;
-    let connection = connection_cache.get_connection(&target);
-
     loop {
         // When the stop file exists, stop the loop
         if stop_file_exists(stop_file) {
@@ -1222,7 +1220,7 @@ fn transaction_thread_function(
             }
             // When balance falls below 1 SOL, take 1 SOL from funds source
             loop {
-                if rpc_client.get_balance(&fee_payer_pubkey).unwrap_or(0) < (LAMPORTS_PER_TRANSFER / 2) {
+                if tpu_client.get_balance(&fee_payer_pubkey).unwrap_or(0) < (LAMPORTS_PER_TRANSFER / 2) {
                     transfer_lamports(
                         &rpc_client,
                         &funds_source,
@@ -1388,7 +1386,7 @@ fn transaction_thread_function(
         //let res = rpc_client.send_transaction(&transaction);
         //println!("RESULT = {:?}", res);
 
-        connection.send_wire_transaction(&tx_bytes);
+        tpu_client.send_wire_transaction(tx_bytes);
     }
 
     // Take back all SOL from the fee payer
@@ -1527,6 +1525,28 @@ fn main()
 
     let mut threads = vec![];
 
+
+    let connection_cache = ConnectionCache::new(DEFAULT_TPU_CONNECTION_POOL_SIZE);
+    let target = current_tpus.get().1;
+    let rpc_client = Arc::new(RpcClient::new_with_commitment(
+                &args.rpc_servers[0],
+                CommitmentConfig::confirmed(),
+            ));
+
+    let websocket_url = "";
+    let tpu_client = Arc::new(
+        TpuClient::new_with_connection_cache(
+            rpc_client,
+            websocket_url,
+            TpuClientConfig::default(),
+            Arc::new(connection_cache),
+                )
+                .unwrap_or_else(|err| {
+                    eprintln!("Could not create TpuClient {:?}", err);
+                    exit(1);
+                }),
+    );
+
     for thread_number in 0..args.num_threads {
         let print_lock = print_lock.clone();
         let rpc_clients = rpc_clients.clone();
@@ -1537,6 +1557,7 @@ fn main()
         let current_tpus = current_tpus.clone();
         let iterations = iterations.clone();
         let stop_file = args.stop_file.clone();
+        let tpu_client = tpu_client.clone();
 
         threads.push(std::thread::spawn(move || {
             transaction_thread_function(
@@ -1549,7 +1570,8 @@ fn main()
                 accounts,
                 current_tpus,
                 iterations,
-                &stop_file.as_str()
+                &stop_file.as_str(),
+                tpu_client
             )
         }));
     }
